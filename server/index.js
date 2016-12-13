@@ -1,9 +1,43 @@
-var app = require('http').createServer();
+/*var app = require('http').createServer();
 var io = require('socket.io')(app);
 
 app.listen(6001);
 
 var Room = require('./room');
+*/
+
+
+
+var Room = require('./room');
+
+
+var express = require('express');
+var app = express();
+
+var server = require('http').Server(app);
+var io = require('socket.io')(server);
+
+app.set('port', (process.env.PORT || 6001));
+
+/*
+app.use(express.static(__dirname + '/public'));
+
+// views is directory for all template files
+app.set('views', __dirname + '/views');
+app.set('view engine', 'ejs');
+
+app.get('/', function(request, response) {
+  response.render('pages/index');
+});
+*/
+app.listen(app.get('port'), function() {
+  console.log('Node app is running on port', app.get('port'));
+});
+
+
+
+
+
 
 console.log('Ok, google. Server is running');
 
