@@ -1,7 +1,7 @@
 var app = require('http').createServer();
 var io = require('socket.io')(app);
 
-app.listen(80);
+app.listen(6000);
 
 console.log('Ok, google. Server is running');
 
