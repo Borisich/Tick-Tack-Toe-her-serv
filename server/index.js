@@ -3,9 +3,11 @@ var io = require('socket.io')(app);
 
 app.listen(6001);
 
+var Room = require('./room');
+
 console.log('Ok, google. Server is running');
 
-var Room = require('./room');
+
 
 
 //массив комнат для одновременной игры
