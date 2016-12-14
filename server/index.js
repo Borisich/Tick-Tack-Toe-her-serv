@@ -14,8 +14,11 @@ var Room = require('./room');
 var express = require('express');
 var app = express();
 
-var server = require('http').Server(app);
-var io = require('socket.io')(server);
+//var server = require('http').Server(app);
+//var io = require('socket.io')(server);
+
+var server = require('http').createServer(app);
+var io = require('socket.io').listen(server);
 
 app.set('port', (process.env.PORT || 6001));
 
@@ -66,7 +69,11 @@ app.get('/', function(request, response) {
 });
 
 
-app.listen(app.get('port'), function() {
+/*app.listen(app.get('port'), function() {
+  console.log('Node app is running on port', app.get('port'));
+});*/
+
+server.listen(app.get('port'), function() {
   console.log('Node app is running on port', app.get('port'));
 });
 
