@@ -4,6 +4,7 @@
 var Room = function(href){
     this.player1 = null;
     this.player2 = null;
+    this.whosTurn = undefined;
     this.id = "?" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, Room.prototype.getIdLength());
     this.inviteLink = href + this.id;
     this.field = [0,0,0,0,0,0,0,0,0];
@@ -67,7 +68,12 @@ Room.prototype.winner = function(){
     else
         return null;
 };
+Room.prototype.sendGameStateToPlayer1 = function(){
+  var self = this;
+  self.player1.emit('continue game', {player1Turn: self.player1Turn, field: self.field, symbol: 'x'});
 
+
+};
 Room.prototype.chat = function(){
     var self = this;
     self.player1.on('message', function(text){
@@ -86,6 +92,7 @@ Room.prototype.game = function(){
     self.player1.emit('start game');
     self.player2.emit('start game');
     //... и о том, что ходит первый игрок
+    self.player1Turn = true;
     self.player1.emit('your turn','x');
     self.player2.emit('wait other player');
     //Игра
@@ -93,6 +100,7 @@ Room.prototype.game = function(){
     //Когда ход игрока 1 закончен
     self.player1.on('turn finished', function(data){
         console.log("Первый походил! Квадрат № " + data);
+        self.player1Turn = false;
         self.saveTurn(self.player1,data);
         self.player2.emit('other player turn', {symbol: 'x', num: data});
         if (self.winner()){
@@ -107,6 +115,7 @@ Room.prototype.game = function(){
     //Когда ход игрока 2 закончен
     self.player2.on('turn finished', function(data){
         console.log("Второй походил! Квадрат № " + data);
+        self.player1Turn = true;
         self.saveTurn(self.player2,data);
         self.player1.emit('other player turn', {symbol: 'o', num: data});
         if (self.winner()){
