@@ -1,48 +1,14 @@
-/*var app = require('http').createServer();
-var io = require('socket.io')(app);
-
-app.listen(6001);
-
-var Room = require('./room');
-*/
-
-
-
-var Room = require('./room');
+const locally = true;
 
 
 var express = require('express');
 var app = express();
 
-//var server = require('http').Server(app);
-//var io = require('socket.io')(server);
-
 var server = require('http').createServer(app);
 var io = require('socket.io').listen(server);
 
-app.set('port', (process.env.PORT || 6001));
-
-/*
-app.use(express.static(__dirname + '/public'));
-
-// views is directory for all template files
-app.set('views', __dirname + '/views');
-app.set('view engine', 'ejs');
-
-app.get('/', function(request, response) {
-  response.render('pages/index');
-});
-*/
-
-/*app.all('*', function(req, res, next) {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'PUT, GET, POST, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  next();
-});
- */
- 
- app.use(function (req, res, next) {
+app.set('port', (process.env.PORT || 80));
+app.use(function (req, res, next) {
 
     // Website you wish to allow to connect
     res.setHeader('Access-Control-Allow-Origin', 'http://mirt.spb.ru');
@@ -60,18 +26,11 @@ app.get('/', function(request, response) {
     // Pass to next layer of middleware
     next();
 });
- 
- 
- 
+
 app.get('/', function(request, response) {
-  
   response.send('Hello man');
 });
 
-
-/*app.listen(app.get('port'), function() {
-  console.log('Node app is running on port', app.get('port'));
-});*/
 
 server.listen(app.get('port'), function() {
   console.log('Node app is running on port', app.get('port'));
@@ -79,7 +38,7 @@ server.listen(app.get('port'), function() {
 
 
 
-
+var Room = require('./room');
 
 
 console.log('Ok, google. Server is running');
@@ -116,17 +75,39 @@ io.on('connection', function (socket) {
         //Если их нет, то создать комнату, отправить пригласительную ссылку на подключение к игре другого клиента
         if (data.params){
             console.log("Получены параметры от клиента: " + data.params);
+            //Если длина на 1 больше чем надо - возможно кто-то хочет восстановить игру
+            if (data.params.length == Room.prototype.getIdLength()+2){
+              console.log("кто-то хочет законнектиться! Последний символ: " + data.params.substr(5,5))
+              console.log("ID комнаты: " + data.params.substr(0,5))
+              //анализируем последний символ: должен быть 1 или 2
+              if (data.params.substr(5,5) == "1"){
+                var player1Join = "true";
+                data.params = data.params.substr(0,5);
+              }
+              if (data.params.substr(5,5) == "2"){
+                var player2Join = "true";
+                data.params = data.params.substr(0,5);
+              }
+            }
             //Если есть комната с таким id, то начать игру
             var room = rooms.searchById(data.params).room;
             if (room)
             {
                 console.log("Комната существует! Игра найдена");
                 //Добавляем игрока в комнату, если его ещё нет
-                if (!room.player2) {
-                    room.addPlayer(socket);
+                if (!room.player2 && !player2Join) {
+                    room.addPlayer2(socket);
                     //запускаем игру и чат
                     room.game();
                     room.chat();
+                }
+                else if (!room.player2 && player2Join){
+                  room.addPlayer2(socket);
+                  player2Join = false;
+                }
+                else if (!room.player1 && player1Join){
+                  room.addPlayer1(socket);
+                  player1Join = false;
                 }
                 else
                 {
@@ -139,8 +120,13 @@ io.on('connection', function (socket) {
         }
         else{
             console.log("Создание комнаты...");
-            room = new Room(socket, data.href);
+            room = new Room(data.href);
             console.log("Создана комната "+room.id);
+            console.log("Количество активных комнат: "+rooms.length);
+            if (!room.player1) {
+              room.addPlayer1(socket);
+            }
+
             rooms.push(room);
             socket.emit('invite link', room.inviteLink);
             socket.on('link getted', function(){
@@ -153,14 +139,24 @@ io.on('connection', function (socket) {
 
         var roomForDelete = rooms.searchByPlayer(socket);
         if (roomForDelete) {
+          if (roomForDelete.room.player1 == socket){
+            roomForDelete.room.player1 = null;
+            console.log("Отключился игрок 1");
+          }
+          else{
+            roomForDelete.room.player2 = null;
+            console.log("Отключился игрок 2");
+          }
+        }
+        /*if (roomForDelete) {
             rooms.splice(roomForDelete.roomNumber, 1);
             console.log("Игрок отключился, удалена комната " + roomForDelete.room.id);
             roomForDelete.room.endGame("disconnect");
         }
         else{
             console.log("Игрок отключился, его комнаты уже не существует");
-        }
+        }*/
+
         console.log("Количество активных комнат: "+rooms.length);
     });
 });
-

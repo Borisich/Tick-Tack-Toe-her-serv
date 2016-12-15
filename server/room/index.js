@@ -1,15 +1,22 @@
 //Комната для игры
 //Хранит 2-х игроков(http-соединения), идентификатор комнаты, пригласительную ссылку, логику игры
 //Реализует процессы игры и чата
-var Room = function(socket,href){
-    this.player1 = socket;
+var Room = function(href){
+    this.player1 = null;
     this.player2 = null;
-    this.id = "?" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 15);
+    this.id = "?" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, Room.prototype.getIdLength());
     this.inviteLink = href + this.id;
     this.field = [0,0,0,0,0,0,0,0,0];
 
 };
-Room.prototype.addPlayer = function(socket){
+Room.prototype.getIdLength = function(){
+  return 4;
+}
+
+Room.prototype.addPlayer1 = function(socket){
+    this.player1 = socket;
+};
+Room.prototype.addPlayer2 = function(socket){
     this.player2 = socket;
 };
 Room.prototype.saveTurn = function(player,n){
