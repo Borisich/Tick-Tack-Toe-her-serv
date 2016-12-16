@@ -2,9 +2,8 @@
 //Хранит 2-х игроков(http-соединения), идентификатор комнаты, пригласительную ссылку, логику игры
 //Реализует процессы игры и чата
 var Room = function(href){
-    this.player1 = null;
-    this.player2 = null;
-    this.whosTurn = undefined;
+    this.player1 = {player: null, nowTurn: true};
+    this.player2 = {player: null, nowTurn: false};;
     this.id = "?" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, Room.prototype.getIdLength());
     this.inviteLink = href + this.id;
     this.field = [0,0,0,0,0,0,0,0,0];
@@ -15,11 +14,16 @@ Room.prototype.getIdLength = function(){
 }
 
 Room.prototype.addPlayer1 = function(socket){
-    this.player1 = socket;
+    this.player1.player = socket;
 };
 Room.prototype.addPlayer2 = function(socket){
-    this.player2 = socket;
+    this.player2.player = socket;
 };
+Romm.prototype.toggleTurn(){
+  this.player1.nowTurn = !this.player1.nowTurn;
+  this.player2.nowTurn = !this.player2.nowTurn;
+}
+
 Room.prototype.saveTurn = function(player,n){
     if (player == this.player1){
         this.field[n-1] = 1;
@@ -87,6 +91,28 @@ Room.prototype.chat = function(){
 };
 
 Room.prototype.game = function(){
+  var self = this;
+  self.player1.emit('game status', {player: self.player1, roomId: self.id, field: self.field});
+  self.player2.emit('game status', {player: self.player2, roomId: self.id, field: self.field});
+  self.player1.on('turn done', function(data){
+    ///operations with data;
+    self.toggleTurn();
+    self.player1.emit('game status', {player: self.player1, roomId: self.id, field: self.field});
+    self.player2.emit('game status', {player: self.player2, roomId: self.id, field: self.field});
+  });
+  self.player2.on('turn done', function(data){
+    ///operations with data;
+    self.toggleTurn();
+    self.player1.emit('game status', {player: self.player1, roomId: self.id, field: self.field});
+    self.player2.emit('game status', {player: self.player2, roomId: self.id, field: self.field});
+  });
+
+
+}
+
+
+
+/*Room.prototype.game = function(){
     var self = this;
     //отправить всем участникам сообщение о начале игры
     self.player1.emit('start game');
@@ -127,7 +153,7 @@ Room.prototype.game = function(){
             self.player2.emit('opponent informed');
         });
     });
-};
+};*/
 
 Room.prototype.endGame = function(reason){
     console.log("Игра закончилась!");
