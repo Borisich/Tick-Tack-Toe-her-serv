@@ -51,7 +51,7 @@ var rooms = [];
 //с методами поиска по разным критериям
 rooms.searchByPlayer = function(player){
     for (var i = 0; i< rooms.length; i++){
-        if ((rooms[i].player1 == player)||(rooms[i].player2 == player)){
+        if ((rooms[i].player1.player == player)||(rooms[i].player2.player == player)){
             return { room: rooms[i], roomNumber: i};
         }
     }
@@ -95,18 +95,31 @@ io.on('connection', function (socket) {
             {
                 console.log("Комната существует! Игра найдена");
                 //Добавляем игрока в комнату, если его ещё нет
-                if (!room.player2 && !player2Join) {
+                console.log("room.player1.player "+ room.player1.player);
+                console.log("room.player2.player "+ room.player2.player);
+                console.log("room.player1Join "+ room.player1Join);
+                console.log("room.player2Join "+ room.player2Join);
+                if (!room.player2.player && !player2Join) {
                     room.addPlayer2(socket);
+                    console.log("dEBUG3");
                     //запускаем игру и чат
+                    console.log("adding player 2...");
+                    console.log("room.player1.player "+ room.player1.player);
+                    console.log("room.player2.player "+ room.player2.player);
                     room.game();
                     room.chat();
                 }
-                else if (!room.player2 && player2Join){
+                else if (!room.player2.player && player2Join){
                   room.addPlayer2(socket);
+                  room.game();
                   player2Join = false;
                 }
-                else if (!room.player1 && player1Join){
+                else if (!room.player1.player && player1Join){
+                  console.log("adding player 1...");
                   room.addPlayer1(socket);
+                  console.log("room.player1.player "+ room.player1.player);
+                  console.log("room.player2.player "+ room.player2.player);
+                  room.game();
                   player1Join = false;
                 }
                 else
@@ -122,12 +135,13 @@ io.on('connection', function (socket) {
             console.log("Создание комнаты...");
             room = new Room(data.href);
             console.log("Создана комната "+room.id);
-            console.log("Количество активных комнат: "+rooms.length);
-            if (!room.player1) {
+
+            if (!room.player1.player) {
               room.addPlayer1(socket);
             }
 
             rooms.push(room);
+            console.log("Количество активных комнат: "+rooms.length);
             socket.emit('invite link', room.inviteLink);
             socket.on('link getted', function(){
                console.log("Клиент получил ссылку для приглашения другого игрока");
@@ -139,12 +153,12 @@ io.on('connection', function (socket) {
 
         var roomForDelete = rooms.searchByPlayer(socket);
         if (roomForDelete) {
-          if (roomForDelete.room.player1 == socket){
-            roomForDelete.room.player1 = null;
+          if (roomForDelete.room.player1.player == socket){
+            roomForDelete.room.player1.player = null;
             console.log("Отключился игрок 1");
           }
           else{
-            roomForDelete.room.player2 = null;
+            roomForDelete.room.player2.player = null;
             console.log("Отключился игрок 2");
           }
         }

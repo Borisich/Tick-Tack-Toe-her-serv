@@ -2,8 +2,8 @@
 //Хранит 2-х игроков(http-соединения), идентификатор комнаты, пригласительную ссылку, логику игры
 //Реализует процессы игры и чата
 var Room = function(href){
-    this.player1 = {player: null, nowTurn: true};
-    this.player2 = {player: null, nowTurn: false};;
+    this.player1 = {player: null, nowTurn: true, playerNumber: 1};
+    this.player2 = {player: null, nowTurn: false, playerNumber: 2};
     this.id = "?" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, Room.prototype.getIdLength());
     this.inviteLink = href + this.id;
     this.field = [0,0,0,0,0,0,0,0,0];
@@ -19,7 +19,7 @@ Room.prototype.addPlayer1 = function(socket){
 Room.prototype.addPlayer2 = function(socket){
     this.player2.player = socket;
 };
-Romm.prototype.toggleTurn(){
+Room.prototype.toggleTurn = function(){
   this.player1.nowTurn = !this.player1.nowTurn;
   this.player2.nowTurn = !this.player2.nowTurn;
 }
@@ -72,39 +72,57 @@ Room.prototype.winner = function(){
     else
         return null;
 };
-Room.prototype.sendGameStateToPlayer1 = function(){
-  var self = this;
-  self.player1.emit('continue game', {player1Turn: self.player1Turn, field: self.field, symbol: 'x'});
 
-
-};
 Room.prototype.chat = function(){
     var self = this;
-    self.player1.on('message', function(text){
-        self.player1.emit('message dilivered to server',text);
-        self.player2.emit('message',text);
+    self.player1.player.on('message', function(text){
+        self.player1.player.emit('message dilivered to server',text);
+        self.player2.player.emit('message',text);
     });
-    self.player2.on('message', function(text){
-        self.player2.emit('message dilivered to server',text);
-        self.player1.emit('message',text);
+    self.player2.player.on('message', function(text){
+        self.player2.player.emit('message dilivered to server',text);
+        self.player1.player.emit('message',text);
     });
 };
 
 Room.prototype.game = function(){
+  console.log("Game started!");
   var self = this;
-  self.player1.emit('game status', {player: self.player1, roomId: self.id, field: self.field});
-  self.player2.emit('game status', {player: self.player2, roomId: self.id, field: self.field});
-  self.player1.on('turn done', function(data){
+  self.player1.player.emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
+  console.log("dEBUG1");
+  self.player2.player.emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
+  console.log("dEBUG2");
+  self.player1.player.removeAllListeners('turn done');
+  self.player1.player.on('turn done', function(data){
+
     ///operations with data;
+
+    console.log("Первый походил! Квадрат № " + data.targetId);
+    self.saveTurn(self.player1,data.targetId);
+    if (self.winner()){
+        self.player2.player.emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
+        self.endGame();
+        return;
+    }
     self.toggleTurn();
-    self.player1.emit('game status', {player: self.player1, roomId: self.id, field: self.field});
-    self.player2.emit('game status', {player: self.player2, roomId: self.id, field: self.field});
+    self.player1.player.emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
+    self.player2.player.emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
   });
-  self.player2.on('turn done', function(data){
+
+  self.player2.player.removeAllListeners('turn done');
+  self.player2.player.on('turn done', function(data){
     ///operations with data;
+
+    console.log("Второй походил! Квадрат № " + data.targetId);
+    self.saveTurn(self.player2,data.targetId);
+    if (self.winner()){
+        self.player1.player.emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
+        self.endGame();
+        return;
+    }
     self.toggleTurn();
-    self.player1.emit('game status', {player: self.player1, roomId: self.id, field: self.field});
-    self.player2.emit('game status', {player: self.player2, roomId: self.id, field: self.field});
+    self.player1.player.emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
+    self.player2.player.emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
   });
 
 
@@ -162,18 +180,18 @@ Room.prototype.endGame = function(reason){
         switch (self.winner()) {
             case self.player1:
                 console.log("Первый выиграл!");
-                self.player1.emit('end game', 'win');
-                self.player2.emit('end game', 'loose');
+                self.player1.player.emit('end game', 'win');
+                self.player2.player.emit('end game', 'loose');
                 break;
             case self.player2:
                 console.log("Второй выиграл!");
-                self.player1.emit('end game', 'loose');
-                self.player2.emit('end game', 'win');
+                self.player1.player.emit('end game', 'loose');
+                self.player2.player.emit('end game', 'win');
                 break;
             case "pat":
                 console.log("Ничья!");
-                self.player1.emit('end game', 'pat');
-                self.player2.emit('end game', 'pat');
+                self.player1.player.emit('end game', 'pat');
+                self.player2.player.emit('end game', 'pat');
                 break;
             default:
         }
@@ -182,8 +200,8 @@ Room.prototype.endGame = function(reason){
         switch (reason) {
             case "disconnect":
                 console.log("Причина: игрок отключился");
-                self.player1 ? self.player1.emit('end game', 'disconnect'):{};
-                self.player2 ? self.player2.emit('end game', 'disconnect'):{};
+                self.player1 ? self.player1.player.emit('end game', 'disconnect'):{};
+                self.player2 ? self.player2.player.emit('end game', 'disconnect'):{};
                 break;
             default:
         }
