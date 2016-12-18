@@ -7,6 +7,7 @@ var Room = function(href){
     this.id = "?" + Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, Room.prototype.getIdLength());
     this.inviteLink = href + this.id;
     this.field = [0,0,0,0,0,0,0,0,0];
+    this.canDelete = true;
 
 };
 Room.prototype.getIdLength = function(){
@@ -23,6 +24,53 @@ Room.prototype.toggleTurn = function(){
   this.player1.nowTurn = !this.player1.nowTurn;
   this.player2.nowTurn = !this.player2.nowTurn;
 }
+Room.prototype.sendGameStatus = function(){
+  var self = this;
+  if (self.player1.player && self.player2.player) {
+    self.canDelete = false;
+  }
+  var player2OpponentOffline;
+  var player1OpponentOffline;
+  self.player1.player ? player2OpponentOffline = false : player2OpponentOffline = true;
+  self.player2.player ? player1OpponentOffline = false : player1OpponentOffline = true;
+
+  for (var i = 0; i < arguments.length; i++) {
+    if (arguments[i]){
+      if (arguments[i] == this.player1.player){
+        arguments[i].emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
+        self.winner() ? arguments[i].emit('opponent status', {opponentOffline: player1OpponentOffline}) : {};
+      }
+      else if (arguments[i] == this.player2.player){
+        arguments[i].emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
+        self.winner() ? arguments[i].emit('opponent status', {opponentOffline: player2OpponentOffline}) : {};
+      }
+    }
+  }
+  if (self.winner()){
+      self.endGame();
+  }
+}
+
+Room.prototype.turnProcessing = function(data){
+  var self = this;
+  if (data.playerNumber == 1){
+    console.log("Первый походил! Квадрат № " + data.targetId);
+    self.saveTurn(self.player1,data.targetId);
+  }
+  else if (data.playerNumber == 2){
+    console.log("Второй походил! Квадрат № " + data.targetId);
+    self.saveTurn(self.player2,data.targetId);
+  }
+  if (!self.winner()) {
+    self.toggleTurn();
+  }
+  else{
+    self.player1.nowTurn = false;
+    self.player2.nowTurn = false;
+  }
+  self.sendGameStatus(self.player1.player, self.player2.player);
+
+};
 
 Room.prototype.saveTurn = function(player,n){
     if (player == this.player1){
@@ -75,123 +123,64 @@ Room.prototype.winner = function(){
 
 Room.prototype.chat = function(){
     var self = this;
-    self.player1.player.on('message', function(text){
-        self.player1.player.emit('message dilivered to server',text);
-        self.player2.player.emit('message',text);
-    });
-    self.player2.player.on('message', function(text){
-        self.player2.player.emit('message dilivered to server',text);
-        self.player1.player.emit('message',text);
-    });
+    if (self.player1.player){
+      self.player1.player.removeAllListeners('message');
+      self.player1.player.on('message', function(text){
+          self.player1.player.emit('message dilivered to server',text);
+          self.player2.player ? self.player2.player.emit('message',text) : {};
+      });
+    }
+    if (self.player2.player){
+      self.player2.player.removeAllListeners('message');
+      self.player2.player.on('message', function(text){
+          self.player2.player.emit('message dilivered to server',text);
+          self.player1.player ? self.player1.player.emit('message',text) : {};
+      });
+    }
 };
+
+
 
 Room.prototype.game = function(){
   console.log("Game started!");
   var self = this;
-  self.player1.player.emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
-  console.log("dEBUG1");
-  self.player2.player.emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
-  console.log("dEBUG2");
-  self.player1.player.removeAllListeners('turn done');
-  self.player1.player.on('turn done', function(data){
+  self.sendGameStatus(self.player1.player, self.player2.player);
 
-    ///operations with data;
-
-    console.log("Первый походил! Квадрат № " + data.targetId);
-    self.saveTurn(self.player1,data.targetId);
-    if (self.winner()){
-        self.player2.player.emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
-        self.endGame();
-        return;
-    }
-    self.toggleTurn();
-    self.player1.player.emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
-    self.player2.player.emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
-  });
-
-  self.player2.player.removeAllListeners('turn done');
-  self.player2.player.on('turn done', function(data){
-    ///operations with data;
-
-    console.log("Второй походил! Квадрат № " + data.targetId);
-    self.saveTurn(self.player2,data.targetId);
-    if (self.winner()){
-        self.player1.player.emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
-        self.endGame();
-        return;
-    }
-    self.toggleTurn();
-    self.player1.player.emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
-    self.player2.player.emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
-  });
-
-
+  if (self.player1.player){
+    self.player1.player.removeAllListeners('turn done');
+    self.player1.player.on('turn done', function(data){
+      self.turnProcessing(data);
+    });
+  }
+  if (self.player2.player){
+    self.player2.player.removeAllListeners('turn done');
+    self.player2.player.on('turn done', function(data){
+      self.turnProcessing(data);
+    });
+  }
 }
-
-
-
-/*Room.prototype.game = function(){
-    var self = this;
-    //отправить всем участникам сообщение о начале игры
-    self.player1.emit('start game');
-    self.player2.emit('start game');
-    //... и о том, что ходит первый игрок
-    self.player1Turn = true;
-    self.player1.emit('your turn','x');
-    self.player2.emit('wait other player');
-    //Игра
-
-    //Когда ход игрока 1 закончен
-    self.player1.on('turn finished', function(data){
-        console.log("Первый походил! Квадрат № " + data);
-        self.player1Turn = false;
-        self.saveTurn(self.player1,data);
-        self.player2.emit('other player turn', {symbol: 'x', num: data});
-        if (self.winner()){
-            self.endGame();
-            return;
-        }
-        self.player2.once('other player turn getted', function(){
-            self.player2.emit('your turn','o');
-            self.player1.emit('opponent informed');
-        });
-    });
-    //Когда ход игрока 2 закончен
-    self.player2.on('turn finished', function(data){
-        console.log("Второй походил! Квадрат № " + data);
-        self.player1Turn = true;
-        self.saveTurn(self.player2,data);
-        self.player1.emit('other player turn', {symbol: 'o', num: data});
-        if (self.winner()){
-            self.endGame();
-            return;
-        }
-        self.player1.once('other player turn getted', function(){
-            self.player1.emit('your turn','x');
-            self.player2.emit('opponent informed');
-        });
-    });
-};*/
 
 Room.prototype.endGame = function(reason){
     console.log("Игра закончилась!");
     var self = this;
+    self.player1.nowTurn = false;
+    self.player2.nowTurn = false;
     if (!reason) {
         switch (self.winner()) {
             case self.player1:
                 console.log("Первый выиграл!");
-                self.player1.player.emit('end game', 'win');
-                self.player2.player.emit('end game', 'loose');
+                self.player1.player ? self.player1.player.emit('end game', 'win') : {};
+                self.player2.player ? self.player2.player.emit('end game', 'loose') : {};
                 break;
             case self.player2:
                 console.log("Второй выиграл!");
-                self.player1.player.emit('end game', 'loose');
-                self.player2.player.emit('end game', 'win');
+                self.player1.player ? self.player1.player.emit('end game', 'loose') : {};
+                self.player2.player ? self.player2.player.emit('end game', 'win') : {};
                 break;
             case "pat":
                 console.log("Ничья!");
-                self.player1.player.emit('end game', 'pat');
-                self.player2.player.emit('end game', 'pat');
+                self.player1.player ? self.player1.player.emit('end game', 'pat') : {};
+                self.player2.player ? self.player2.player.emit('end game', 'pat') : {};
                 break;
             default:
         }
@@ -200,9 +189,9 @@ Room.prototype.endGame = function(reason){
         switch (reason) {
             case "disconnect":
                 console.log("Причина: игрок отключился");
-                self.player1 ? self.player1.player.emit('end game', 'disconnect'):{};
+                /*self.player1 ? self.player1.player.emit('end game', 'disconnect'):{};
                 self.player2 ? self.player2.player.emit('end game', 'disconnect'):{};
-                break;
+                break;*/
             default:
         }
     }
