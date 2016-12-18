@@ -38,11 +38,11 @@ Room.prototype.sendGameStatus = function(){
     if (arguments[i]){
       if (arguments[i] == this.player1.player){
         arguments[i].emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
-        self.winner() ? arguments[i].emit('opponent status', {opponentOffline: player1OpponentOffline}) : {};
+        arguments[i].emit('opponent status', {opponentOffline: player1OpponentOffline});
       }
       else if (arguments[i] == this.player2.player){
         arguments[i].emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
-        self.winner() ? arguments[i].emit('opponent status', {opponentOffline: player2OpponentOffline}) : {};
+        arguments[i].emit('opponent status', {opponentOffline: player2OpponentOffline});
       }
     }
   }
