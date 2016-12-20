@@ -159,29 +159,71 @@ Room.prototype.game = function(){
     });
   }
 };
-Room.prototype.setNewGame = function(){
+Room.prototype.setNewGame = function(number){
   var self = this;
-  self.player1.nowTurn = true;
-  self.player2.nowTurn = false;
+  switch (number) {
+    case 1:
+      self.player1.nowTurn = true;
+      self.player2.nowTurn = false;
+      break;
+    case 2:
+      self.player2.nowTurn = true;
+      self.player1.nowTurn = false;
+      break;
+    default:
+      self.player1.nowTurn = true;
+      self.player2.nowTurn = false;
+  }
   this.field = [0,0,0,0,0,0,0,0,0];
   this.canDelete = true;
 };
 
 Room.prototype.restartGameListener = function(){
   var self = this;
-  self.player1.player.on('restart request', function(){
-    self.player2.player.removeAllListeners('restart request');
-    self.player2.player.emit('restart request');
-    self.player2.player.once('restart accepted', function(){
-      self.player1.player.emit('restart accepted');
-      self.setNewGame();
-      self.game();
+  if (self.player1.player){
+    var requestsCount1 = 0;
+    self.player1.player.on('restart request', function(){
+      console.log("restart request from player1 getted")
+      requestsCount1++;
+      self.player2.player.emit('restart request');
+      if (requestsCount1 == 1){
+        //self.player2.player.removeAllListeners('restart request');
+        self.player2.player.once('restart accepted', function(){
+          self.player1.player.emit('restart accepted');
+          self.setNewGame(1);
+          self.game();
 
-    });
-    self.player2.player.once('restart canceled', function(){
-      self.player1.player.emit('restart canceled');
-    });
-  })
+        });
+        console.log("restart CANCELED FROM PLAYER2 LISTENING");
+        self.player2.player.on('restart canceled', function(){
+          console.log("restart CANCELED FROM PLAYER2 RECEIVED");
+          self.player1.player.emit('restart canceled');
+        });
+      }
+    })
+  }
+  if (self.player2.player){
+    var requestsCount2 = 0;
+    self.player2.player.on('restart request', function(){
+      console.log("restart request from player2 getted");
+      requestsCount2++;
+      self.player1.player.emit('restart request');
+      if (requestsCount2 == 1){
+        //self.player1.player.removeAllListeners('restart request');
+        self.player1.player.once('restart accepted', function(){
+          self.player2.player.emit('restart accepted');
+          self.setNewGame(2);
+          self.game();
+
+        });
+        console.log("restart CANCELED FROM PLAYER1 LISTENING");
+        self.player1.player.on('restart canceled', function(){
+          console.log("restart CANCELED FROM PLAYER1 RECEIVED");
+          self.player2.player.emit('restart canceled');
+        });
+      }
+    })
+  }
 
 
 };
