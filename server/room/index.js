@@ -158,8 +158,33 @@ Room.prototype.game = function(){
       self.turnProcessing(data);
     });
   }
-}
+};
+Room.prototype.setNewGame = function(){
+  var self = this;
+  self.player1.nowTurn = true;
+  self.player2.nowTurn = false;
+  this.field = [0,0,0,0,0,0,0,0,0];
+  this.canDelete = true;
+};
 
+Room.prototype.restartGameListener = function(){
+  var self = this;
+  self.player1.player.on('restart request', function(){
+    self.player2.player.removeAllListeners('restart request');
+    self.player2.player.emit('restart request');
+    self.player2.player.once('restart accepted', function(){
+      self.player1.player.emit('restart accepted');
+      self.setNewGame();
+      self.game();
+
+    });
+    self.player2.player.once('restart canceled', function(){
+      self.player1.player.emit('restart canceled');
+    });
+  })
+
+
+};
 Room.prototype.endGame = function(reason){
     console.log("Игра закончилась!");
     var self = this;
@@ -195,5 +220,6 @@ Room.prototype.endGame = function(reason){
             default:
         }
     }
+    self.restartGameListener();
 };
 module.exports = Room;
