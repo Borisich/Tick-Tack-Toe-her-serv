@@ -13,17 +13,16 @@ var Room = function(href){
 Room.prototype.getIdLength = function(){
   return 4;
 }
-
+//Добавление в комнату игрока 1
 Room.prototype.addPlayer1 = function(socket){
     this.player1.player = socket;
 };
+//Добавление в комнату игрока 2
 Room.prototype.addPlayer2 = function(socket){
     this.player2.player = socket;
 };
-Room.prototype.toggleTurn = function(){
-  this.player1.nowTurn = !this.player1.nowTurn;
-  this.player2.nowTurn = !this.player2.nowTurn;
-}
+
+//Отправка игрокам (игроку) информации о состоянии игры
 Room.prototype.sendGameStatus = function(){
   var self = this;
   if (self.player1.player && self.player2.player) {
@@ -50,19 +49,28 @@ Room.prototype.sendGameStatus = function(){
       self.endGame();
   }
 }
-
+//обработка информации о ходе игрока
 Room.prototype.turnProcessing = function(data){
   var self = this;
+  var saveTurn = function(player,n){
+      if (player == self.player1){
+          self.field[n-1] = 1;
+      }
+      else if (player == self.player2){
+          self.field[n-1] = -1;
+      }
+  };
   if (data.playerNumber == 1){
     console.log("Первый походил! Квадрат № " + data.targetId);
-    self.saveTurn(self.player1,data.targetId);
+    saveTurn(self.player1,data.targetId);
   }
   else if (data.playerNumber == 2){
     console.log("Второй походил! Квадрат № " + data.targetId);
-    self.saveTurn(self.player2,data.targetId);
+    saveTurn(self.player2,data.targetId);
   }
   if (!self.winner()) {
-    self.toggleTurn();
+    self.player1.nowTurn = !this.player1.nowTurn;
+    self.player2.nowTurn = !this.player2.nowTurn;
   }
   else{
     self.player1.nowTurn = false;
@@ -72,14 +80,14 @@ Room.prototype.turnProcessing = function(data){
 
 };
 
-Room.prototype.saveTurn = function(player,n){
+/*Room.prototype.saveTurn = function(player,n){
     if (player == this.player1){
         this.field[n-1] = 1;
     }
     else if (player == this.player2){
         this.field[n-1] = -1;
     }
-};
+};*/
 Room.prototype.winner = function(){
     if((this.field[0]+this.field[1]+this.field[2]==3) ||
         (this.field[3]+this.field[4]+this.field[5]==3) ||
@@ -144,8 +152,20 @@ Room.prototype.chat = function(){
 Room.prototype.game = function(){
   console.log("Game started!");
   var self = this;
+  self.restartGameListener();
+  function turnDoneListen(){
+    for (var i = 0; i < arguments.length; i++) {
+      if (arguments[i]){
+          arguments[i].removeAllListeners('turn done');
+          arguments[i].on('turn done', function(data){
+            self.turnProcessing(data);
+          });
+      }
+    }
+  }
+  turnDoneListen(self.player1.player, self.player2.player);
   self.sendGameStatus(self.player1.player, self.player2.player);
-
+/*
   if (self.player1.player){
     self.player1.player.removeAllListeners('turn done');
     self.player1.player.on('turn done', function(data){
@@ -157,8 +177,10 @@ Room.prototype.game = function(){
     self.player2.player.on('turn done', function(data){
       self.turnProcessing(data);
     });
-  }
+  }*/
 };
+
+//Установка параметров комнаты в состояние начала игры
 Room.prototype.setNewGame = function(number){
   var self = this;
   switch (number) {
@@ -181,6 +203,35 @@ Room.prototype.setNewGame = function(number){
 Room.prototype.restartGameListener = function(){
   var self = this;
   if (self.player1.player){
+    self.player1.player.on('restart request', function(){
+      self.player2.player.emit('restart request');
+    });
+    self.player1.player.on('restart accepted', function(){
+      self.player2.player.emit('restart accepted');
+      self.setNewGame(2);
+      self.game();
+    });
+    self.player1.player.on('restart canceled', function(){
+      self.player2.player.emit('restart canceled');
+    });
+  }
+  if (self.player2.player){
+    self.player2.player.on('restart request', function(){
+      self.player1.player.emit('restart request');
+    });
+    self.player2.player.on('restart accepted', function(){
+      self.player1.player.emit('restart accepted');
+      self.setNewGame(1);
+      self.game();
+    });
+    self.player2.player.on('restart canceled', function(){
+      self.player1.player.emit('restart canceled');
+    });
+  }
+
+
+
+  /*if (self.player1.player){
     var requestsCount1 = 0;
     self.player1.player.on('restart request', function(){
       console.log("restart request from player1 getted")
@@ -223,7 +274,7 @@ Room.prototype.restartGameListener = function(){
         });
       }
     })
-  }
+  }*/
 
 
 };
@@ -262,6 +313,6 @@ Room.prototype.endGame = function(reason){
             default:
         }
     }
-    self.restartGameListener();
+
 };
 module.exports = Room;
