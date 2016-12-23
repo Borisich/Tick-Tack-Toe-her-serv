@@ -141,12 +141,15 @@ io.on('connection', function (socket) {
           if (roomForDelete.room.player1.player == socket){
             roomForDelete.room.player1.player = null;
             console.log("Отключился игрок 1");
-            roomForDelete.room.player2.player ? roomForDelete.room.sendGameStatus(roomForDelete.room.player2.player) : {};
+            //roomForDelete.room.player2.player ? roomForDelete.room.sendGameStatus(roomForDelete.room.player2.player) : {};
+
+            if (roomForDelete.room.player2.player) roomForDelete.room.player2.player.emit('opponent status', {opponentOffline: true});
           }
           else{
             roomForDelete.room.player2.player = null;
             console.log("Отключился игрок 2");
-            roomForDelete.room.player1.player ? roomForDelete.room.sendGameStatus(roomForDelete.room.player1.player) : {};
+            //roomForDelete.room.player1.player ? roomForDelete.room.sendGameStatus(roomForDelete.room.player1.player) : {};
+            if (roomForDelete.room.player1.player) roomForDelete.room.player1.player.emit('opponent status', {opponentOffline: true});
           }
           //удаляем комнату, если её разрешено удалять
           if (roomForDelete.room.canDelete){

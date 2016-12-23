@@ -22,63 +22,8 @@ Room.prototype.addPlayer2 = function(socket){
     this.player2.player = socket;
 };
 
-//Отправка игрокам (игроку) информации о состоянии игры
-Room.prototype.sendGameStatus = function(){
-  var self = this;
-  if (self.player1.player && self.player2.player) {
-    self.canDelete = false;
-  }
-  var player2OpponentOffline;
-  var player1OpponentOffline;
-  self.player1.player ? player2OpponentOffline = false : player2OpponentOffline = true;
-  self.player2.player ? player1OpponentOffline = false : player1OpponentOffline = true;
 
-  for (var i = 0; i < arguments.length; i++) {
-    if (arguments[i]){
-      if (arguments[i] == this.player1.player){
-        arguments[i].emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
-        arguments[i].emit('opponent status', {opponentOffline: player1OpponentOffline});
-      }
-      else if (arguments[i] == this.player2.player){
-        arguments[i].emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
-        arguments[i].emit('opponent status', {opponentOffline: player2OpponentOffline});
-      }
-    }
-  }
-  if (self.winner()){
-      self.endGame();
-  }
-}
-//обработка информации о ходе игрока
-Room.prototype.turnProcessing = function(data){
-  var self = this;
-  var saveTurn = function(player,n){
-      if (player == self.player1){
-          self.field[n-1] = 1;
-      }
-      else if (player == self.player2){
-          self.field[n-1] = -1;
-      }
-  };
-  if (data.playerNumber == 1){
-    console.log("Первый походил! Квадрат № " + data.targetId);
-    saveTurn(self.player1,data.targetId);
-  }
-  else if (data.playerNumber == 2){
-    console.log("Второй походил! Квадрат № " + data.targetId);
-    saveTurn(self.player2,data.targetId);
-  }
-  if (!self.winner()) {
-    self.player1.nowTurn = !this.player1.nowTurn;
-    self.player2.nowTurn = !this.player2.nowTurn;
-  }
-  else{
-    self.player1.nowTurn = false;
-    self.player2.nowTurn = false;
-  }
-  self.sendGameStatus(self.player1.player, self.player2.player);
 
-};
 
 /*Room.prototype.saveTurn = function(player,n){
     if (player == this.player1){
@@ -150,34 +95,81 @@ Room.prototype.chat = function(){
 
 
 Room.prototype.game = function(){
-  console.log("Game started!");
   var self = this;
+  console.log("Game "+self.id+" started!");
   self.restartGameListener();
+
+  //Отправка игрокам (игроку) информации о состоянии игры
+  function sendGameStatus(){
+    if (self.player1.player && self.player2.player) {
+      self.canDelete = false;
+    }
+    var player2OpponentOffline;
+    var player1OpponentOffline;
+    self.player1.player ? player2OpponentOffline = false : player2OpponentOffline = true;
+    self.player2.player ? player1OpponentOffline = false : player1OpponentOffline = true;
+
+    for (var i = 0; i < arguments.length; i++) {
+      if (arguments[i]){
+        if (arguments[i] == self.player1.player){
+          arguments[i].emit('game status', {playerNumber: self.player1.playerNumber, nowTurn: self.player1.nowTurn, roomId: self.id, field: self.field});
+          arguments[i].emit('opponent status', {opponentOffline: player1OpponentOffline});
+        }
+        else if (arguments[i] == self.player2.player){
+          arguments[i].emit('game status', {playerNumber: self.player2.playerNumber, nowTurn: self.player2.nowTurn, roomId: self.id, field: self.field});
+          arguments[i].emit('opponent status', {opponentOffline: player2OpponentOffline});
+        }
+      }
+    }
+    if (self.winner()){
+        self.endGame();
+    }
+  }
+
+
+
+  //обработка информации о ходе игрока
+  function turnProcessing(data){
+    var saveTurn = function(player,n){
+        if (player == self.player1){
+            self.field[n-1] = 1;
+        }
+        else if (player == self.player2){
+            self.field[n-1] = -1;
+        }
+    };
+    if (data.playerNumber == 1){
+      console.log("Первый походил! Квадрат № " + data.targetId);
+      saveTurn(self.player1,data.targetId);
+    }
+    else if (data.playerNumber == 2){
+      console.log("Второй походил! Квадрат № " + data.targetId);
+      saveTurn(self.player2,data.targetId);
+    }
+    if (!self.winner()) {
+      self.player1.nowTurn = !self.player1.nowTurn;
+      self.player2.nowTurn = !self.player2.nowTurn;
+    }
+    else{
+      self.player1.nowTurn = false;
+      self.player2.nowTurn = false;
+    }
+    sendGameStatus(self.player1.player, self.player2.player);
+  };
+
   function turnDoneListen(){
     for (var i = 0; i < arguments.length; i++) {
       if (arguments[i]){
           arguments[i].removeAllListeners('turn done');
           arguments[i].on('turn done', function(data){
-            self.turnProcessing(data);
+            turnProcessing(data);
           });
       }
     }
   }
   turnDoneListen(self.player1.player, self.player2.player);
-  self.sendGameStatus(self.player1.player, self.player2.player);
-/*
-  if (self.player1.player){
-    self.player1.player.removeAllListeners('turn done');
-    self.player1.player.on('turn done', function(data){
-      self.turnProcessing(data);
-    });
-  }
-  if (self.player2.player){
-    self.player2.player.removeAllListeners('turn done');
-    self.player2.player.on('turn done', function(data){
-      self.turnProcessing(data);
-    });
-  }*/
+  sendGameStatus(self.player1.player, self.player2.player);
+
 };
 
 //Установка параметров комнаты в состояние начала игры
@@ -203,27 +195,33 @@ Room.prototype.setNewGame = function(number){
 Room.prototype.restartGameListener = function(){
   var self = this;
   if (self.player1.player){
+    self.player1.player.removeAllListeners('restart request');
     self.player1.player.on('restart request', function(){
       self.player2.player.emit('restart request');
     });
+    self.player1.player.removeAllListeners('restart accepted');
     self.player1.player.on('restart accepted', function(){
       self.player2.player.emit('restart accepted');
       self.setNewGame(2);
       self.game();
     });
+    self.player1.player.removeAllListeners('restart canceled');
     self.player1.player.on('restart canceled', function(){
       self.player2.player.emit('restart canceled');
     });
   }
   if (self.player2.player){
+    self.player2.player.removeAllListeners('restart request');
     self.player2.player.on('restart request', function(){
       self.player1.player.emit('restart request');
     });
+    self.player2.player.removeAllListeners('restart accepted');
     self.player2.player.on('restart accepted', function(){
       self.player1.player.emit('restart accepted');
       self.setNewGame(1);
       self.game();
     });
+    self.player2.player.removeAllListeners('restart canceled');
     self.player2.player.on('restart canceled', function(){
       self.player1.player.emit('restart canceled');
     });
